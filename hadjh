@@ -1,0 +1,39 @@
+from cx_Freeze import setup, Executable
+import sys
+import os
+
+# Ensure Tcl/Tk libraries are correctly referenced for Tkinter
+PYTHON_INSTALL_DIR = os.path.dirname(os.path.dirname(os.__file__))
+os.environ['TCL_LIBRARY'] = os.path.join(PYTHON_INSTALL_DIR, 'tcl', 'tcl8.6')
+os.environ['TK_LIBRARY'] = os.path.join(PYTHON_INSTALL_DIR, 'tcl', 'tk8.6')
+
+# Define the base for Windows (None for general or console applications)
+base = None
+if sys.platform == 'win32':
+    base = None  # You can add "Win32GUI" if you want to hide the terminal window in GUI apps
+
+# Define the executable
+executables = [Executable("train.py", base=base, targetName="ToolBox.exe")]
+
+# List of packages that need to be included in the build
+packages = [
+    "idna", "os", "sys", "cx_Freeze", "tkinter", "cv2", "setup", "numpy", 
+    "PIL", "pandas", "datetime", "time"
+]
+
+# Options for building the executable
+options = {
+    'build_exe': {
+        'packages': packages,
+        'include_files': [],  # Add any additional files like images, databases if needed
+    },
+}
+
+# Setup function to define build parameters
+setup(
+    name="ToolBox",
+    options=options,
+    version="0.0.1",
+    description="Vision ToolBox",
+    executables=executables
+)
