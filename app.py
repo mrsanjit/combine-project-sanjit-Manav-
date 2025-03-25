@@ -1,252 +1,298 @@
-# importing the necessary dependencies
-from flask import Flask, render_template, request,send_file
-from flask_cors import CORS,cross_origin
-import numpy as np
-import os
-import tensorflow as tf
-import easyocr as ocr
+import tkinter as tk
+from tkinter import Message, Text
 import cv2
-from object_detection.utils import label_map_util
+import os
+import shutil
+import csv
+import numpy as np
+from PIL import Image, ImageTk
+import pandas as pd
+import datetime
+import time
+import tkinter.ttk as ttk
+import tkinter.font as font
 
-os.putenv('LANG', 'en_US.UTF-8')
-os.putenv('LC_ALL', 'en_US.UTF-8')
+# Create the main window
+window = tk.Tk()
+window.title("Face_Recogniser Attendance System")
+window.geometry('1366x768')
+window.configure(background='grey')
 
-app = Flask(__name__) # initializing a flask app
-CORS(app)
+# Window configuration
+window.grid_rowconfigure(0, weight=1)
+window.grid_columnconfigure(0, weight=1)
 
-MODEL_NAME = 'auto_no_plate_detection_model'
+# Display images
+path = "im0.jpg"
+path2 = "im1.jpg"
+img = ImageTk.PhotoImage(Image.open(path))
+img2 = ImageTk.PhotoImage(Image.open(path2))
+panel = tk.Label(window, image=img)
+panel2 = tk.Label(window, image=img2)
+panel.pack(side="left", fill="x", expand="no")
+panel2.pack(side="left", fill="x", expand="no")
 
-# Path to frozen detection graph. This is the actual model that is used for the object detection.
-PATH_TO_FROZEN_GRAPH = MODEL_NAME + '/frozen_inference_graph.pb'
+message = tk.Label(window, text="Face-Recognition-Attendance-System", bg="grey",
+                   fg="black", width=50, height=3, font=('arial', 30, 'italic bold underline'))
+message.place(x=80, y=20)
 
-# List of the strings that is used to add correct label for each box.
-PATH_TO_LABELS = os.path.join('training', 'classes.pbtxt')
+# Labels and Entry Widgets
+lbl = tk.Label(window, text="EMP ID", width=20, height=2,
+               fg="white", bg="green", font=('times', 15, ' bold '))
 
-# loading tf graph
-detection_graph = tf.Graph()
-with detection_graph.as_default():
-    od_graph_def = tf.GraphDef()
-    with tf.gfile.GFile(PATH_TO_FROZEN_GRAPH, 'rb') as fid:
-        serialized_graph = fid.read()
-        od_graph_def.ParseFromString(serialized_graph)
-        tf.import_graph_def(od_graph_def, name='')
+lbl.place(x=400, y=200)
 
-# loading classes file
-category_index = label_map_util.create_category_index_from_labelmap(PATH_TO_LABELS, use_display_name=True)
+txt = tk.Entry(window, width=20, bg="green",
+               fg="white", font=('times', 15, ' bold '))
 
-# run reader object of ocr
-reader = ocr.Reader(['en'])
+txt.place(x=700, y=215)
 
-# States of india
-states={"AN":"Andaman and Nicobar","AP":"Andhra Pradesh","AR":"Arunachal Pradesh","AS":"Assam","BR":"Bihar",
-        "CH":"Chandigarh","DN":"Dadra and Nagar Haveli","DD":"Daman and Diu","DL":"Delhi","GA":"Goa","GJ":"Gujarat",
-        "HR":"Haryana","HP":"Himachal Pradesh","JK":"Jammu and Kashmir","KA":"Karnataka","KL":"Kerala","LD":"Lakshadweep",
-        "MP":"Madhya Pradesh","MH":"Maharashtra","MN":"Manipur","ML":"Meghalaya","MZ":"Mizoram","NL":"Nagaland","OD":"Odissa",
-        "PY":"Pondicherry","PN":"Punjab","RJ":"Rajasthan","SK":"Sikkim","TN":"TamilNadu","TR":"Tripura","UP":"Uttar Pradesh",
-        "WB":"West Bengal","CG":"Chhattisgarh","TS":"Telangana","JH":"Jharkhand","UK":"Uttarakhand"}
+lbl2 = tk.Label(window, text="Employee Name", width=20, fg="white",
+                bg="green", height=2, font=('times', 15, ' bold '))
 
+lbl2.place(x=400, y=300)
 
+txt2 = tk.Entry(window, width=20, bg="green",
+                fg="white", font=('times', 15, ' bold '))
 
-@app.route('/',methods=['GET'])  # route to display the home page
-@cross_origin()
-def homePage():
+txt2.place(x=700, y=315)
+
+lbl3 = tk.Label(window, text="Notification : ", width=20, fg="white",
+                bg="green", height=2, font=('times', 15, ' bold underline '))
+
+lbl3.place(x=400, y=400)
+
+message = tk.Label(window, text="", bg="green", fg="white", width=30,
+                   height=2, activebackground="yellow", font=('times', 15, ' bold '))
+
+message.place(x=700, y=400)
+
+lbl3 = tk.Label(window, text="Attendance : ", width=20, fg="white",
+                bg="green", height=2, font=('times', 15, ' bold  underline'))
+
+lbl3.place(x=400, y=600)
+
+message2 = tk.Label(window, text="", fg="white", bg="green",
+                    activeforeground="green", width=30, height=2, font=('times', 15, ' bold '))
+
+message2.place(x=700, y=600)
+
+# Helper Functions
+def clear():
+    txt.delete(0, 'end')
+    message.configure(text="")
+
+def clear2():
+    txt2.delete(0, 'end')
+    message.configure(text="")
+
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+def TakeImages():
+    Id = (txt.get())
+    name = (txt2.get())
     
-    return render_template("index.html")
+    if(is_number(Id) and name.isalpha()):
+        cam = cv2.VideoCapture(0)
+        if not cam.isOpened():
+            message.configure(text="Error: Could not access the camera.")
+            return
+        
+        harcascadePath = "haarcascade_frontalface_default.xml"
+        detector = cv2.CascadeClassifier(harcascadePath)
+        
+        if not detector.empty():
+            sampleNum = 0
+            while True:
+                ret, img = cam.read()
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                faces = detector.detectMultiScale(gray, 1.3, 5)
+                
+                for (x, y, w, h) in faces:
+                    cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                    sampleNum += 1
+                    cv2.imwrite(f"TrainingImage/{name}.{Id}.{sampleNum}.jpg", gray[y:y + h, x:x + w])
+                    cv2.imshow('frame', img)
 
-@app.route('/startapp',methods=['POST','GET']) # route to show the predictions in a web UI
-@cross_origin()
-def upload_img():
-    if request.method == 'POST':
-        return render_template('upload.html')
+                if cv2.waitKey(100) & 0xFF == ord('q') or sampleNum > 100:
+                    break
 
+            cam.release()
+            cv2.destroyAllWindows()
+            res = f"Images Saved for ID : {Id} Name : {name}"
+            row = [Id, name]
+            
+            if not os.path.exists('EmployeeDetails'):
+                os.makedirs('EmployeeDetails')
+            
+            with open('EmployeeDetails/EmployeeDetails.csv', 'a+') as csvFile:
+                writer = csv.writer(csvFile)
+                writer.writerow(row)
+            csvFile.close()
+            message.configure(text=res)
+        else:
+            message.configure(text="Error: Haar cascade not loaded.")
     else:
-        return "something went wrong"
+        if is_number(Id):
+            res = "Enter Alphabetical Name"
+        else:
+            res = "Enter Numeric Id"
+        message.configure(text=res)
 
+def TrainImages():
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+    harcascadePath = "haarcascade_frontalface_default.xml"
+    detector = cv2.CascadeClassifier(harcascadePath)
+    faces, Id = getImagesAndLabels("TrainingImage")
+    recognizer.train(faces, np.array(Id))
+    recognizer.save("TrainingImageLabel/Trainner.yml")
+    res = "Image Trained"
+    message.configure(text=res)
 
+def getImagesAndLabels(path):
+    imagePaths = [os.path.join(path, f) for f in os.listdir(path)]
+    faces = []
+    Ids = []
+    
+    for imagePath in imagePaths:
+        pilImage = Image.open(imagePath).convert('L')
+        imageNp = np.array(pilImage, 'uint8')
+        Id = int(os.path.split(imagePath)[-1].split(".")[1])
+        faces.append(imageNp)
+        Ids.append(Id)
+    return faces, Ids
 
-@app.route('/detection',methods=['POST','GET']) # route to show the predictions in a web UI
-@cross_origin()
-def detection():
-    if request.method == 'POST':
-        try:
-            #reading image file
-            uploaded_file = request.files['upload_file']
-            filename = uploaded_file.filename
+def TrackImages():
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+    recognizer.read("TrainingImageLabel/Trainner.yml")
+    harcascadePath = "haarcascade_frontalface_default.xml"
+    faceCascade = cv2.CascadeClassifier(harcascadePath)
+    df = pd.read_csv("EmployeeDetails/EmployeeDetails.csv")
+    
+    cam = cv2.VideoCapture(0)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    col_names = ['Id', 'Name', 'Date', 'Time']
+    attendance = pd.DataFrame(columns=col_names)
 
-            #procede only if file is available
-            if uploaded_file.filename != '':
-                uploaded_file.save(filename)
+    while True:
+        ret, im = cam.read()
+        if not ret:
+            break  # If no frame is captured, break the loop
 
+        gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        faces = faceCascade.detectMultiScale(gray, 1.2, 5)
+        
+        for (x, y, w, h) in faces:
+            cv2.rectangle(im, (x, y), (x + w, y + h), (225, 0, 0), 2)
+            Id, conf = recognizer.predict(gray[y:y + h, x:x + w])
 
-
-                #procede only if image is in "jpg,jpeg,png" format
-                image_file_name=str(filename)
-                name_split = image_file_name.split(".")
-                extension = name_split[-1]
-                extension = extension.upper()
-                allowed_extensions = ["JPG","JPEG","PNG"]
-                proceed = "False"
-                for i in allowed_extensions:
-                    if (i == extension):
-                        proceed = "True"
-                        print("Extension Exists")
-
-                # procede only if for allowed extension of image file
-                if proceed == "True":
-                    #loading image using cv2
-                    try:
-                        image_np = cv2.imread(filename, 1)
-                        image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
-                        image_np = cv2.resize(image_np, (800, 600))
-                    except Exception as e:
-                        print('Error with image file properties',e)
-
-                    # deleting previous cropped image files present in detected_number_plate
-                    delete_files = './detected_number_plate'
-                    images_in_folder = os.listdir(delete_files)
-                    for img in images_in_folder:
-                        try:
-                            os.remove("./detected_number_plate/" + img)
-                        except Exception as e:
-                            print("Error in deleting",e)
-
-                    try:
-                        with detection_graph.as_default():
-                            with tf.Session(graph=detection_graph) as sess:
-                                while True:
-
-                                    # Max No of number plates you want to detect from one image
-                                    num_plate_detect = 1
-
-                                    #Detection threshold value
-                                    score_thresh = 0.5
-
-                                    #Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-                                    image_np_expanded = np.expand_dims(image_np, axis=0)
-                                    image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
-
-                                    #Each box represents a part of the image where a particular object was detected.
-                                    boxes = detection_graph.get_tensor_by_name('detection_boxes:0')
-
-                                    # Each score represent how level of confidence for each of the objects.
-                                    # Score is shown on the result image, together with the class label.
-                                    scores = detection_graph.get_tensor_by_name('detection_scores:0')
-
-                                    classes = detection_graph.get_tensor_by_name('detection_classes:0')
-
-                                    num_detections = detection_graph.get_tensor_by_name('num_detections:0')
-
-                                    # shape of image
-                                    img_height, img_width, img_channel = image_np.shape
-
-                                    # Actual detection.
-                                    (boxes, scores, classes, num_detections) = sess.run([boxes, scores, classes, num_detections],
-                                                                                     feed_dict={image_tensor: image_np_expanded})
-                                    boxes = np.squeeze(boxes)
-                                    classes = np.squeeze(classes).astype(np.int32)
-                                    scores = np.squeeze(scores)
-
-                                    # saving bbox images
-                                    image_np1 = cv2.imread(filename, 1)
-                                    image_np1 = cv2.cvtColor(image_np1, cv2.COLOR_BGR2RGB)
-                                    image_np1 = cv2.resize(image_np1, (800, 600))
-
-                                    min_score_thresh = 0.20
-                                    for j in range(0, num_plate_detect):
-                                        true_boxes = boxes[j][scores[j] > min_score_thresh]
-                                        for i in range(true_boxes.shape[0]):
-                                            ymin = int(true_boxes[i,0]*img_height)
-                                            xmin = int(true_boxes[i,1]*img_width)
-                                            ymax = int(true_boxes[i,2]*img_height)
-                                            xmax = int(true_boxes[i,3]*img_width)
-
-                                            #Increasing Height & width of bbox for improving accuracy of OCR
-                                            ymax = ymax+30
-                                            xmax = xmax+30
-                                            ymin = ymin-20
-                                            xmin = xmin-20
-
-                                            #cropping and saving the detected number plate images into detected_number_plate folder
-                                            detected_images = './detected_number_plate/'
-                                            roi = image_np1[ymin:ymax,xmin:xmax]
-                                            cv2.imwrite(detected_images+"box_{}.png".format(str(j)), roi)
-
-                                        print("Saved images Successfully")
-
-                                    break
-
-                    except Exception as e:
-                        return "Something Went Wrong....Unable to Detect Please try again."
-
-
-                    # Now convert cropped images into text using EasyOcr
-                    try:
-                        list_of_files = os.listdir("./detected_number_plate")
-                        no_of_images = len(list_of_files)
-
-                        for k in range(0, no_of_images):
-                            output = reader.readtext(detected_images + 'box_' + str(k) + '.png')
-                            final_output = output[0][1]
-
-                    except Exception as e:
-                            return "Something Went Wrong....Unable to do OCR Please try again."
-
-
-                    # Extracting state from extracted Number text
-                    try:
-                        first_state = []
-                        final_output = final_output.replace(" ", "")
-
-                        for i in range(len(final_output)):
-                            if (final_output[i].isalpha()):
-                                if len(first_state)!= 2:
-                                    first_state.append(final_output[i])
-
-                        #initialise empty string
-                        str1 = ""
-                        code = str1.join(first_state)
-                        code = code.upper()
-                        final_state = states[code]
-
-                        # Sending map images url and state name to html
-                        image_name1 = "./static/maps/"+str(code)+".jpg"
-                        state_and_no = str(final_state) + " :- " + str(final_output)
-
-                        return render_template('show_map.html', image_name1=image_name1, state_name=state_and_no)
-
-                    except Exception as e:
-                        return "Something Went Wrong....Text extraction error Please try again."
-
+            if conf < 50:
+                ts = time.time()
+                date = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
+                timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
+                aa = df.loc[df['Id'] == Id]['Name'].values
+                if len(aa) > 0:
+                    name = aa[0]  # Extract the name (first element of the list)
+                    tt = str(Id) + "-" + name
+                    attendance.loc[len(attendance)] = [Id, name, date, timeStamp]
                 else:
-                    return 'Error: Please Make Sure that image file is in standard acceptable extension,Please go through given Sample image file format'
+                    name = "Unknown"
+                    tt = str(Id)
 
             else:
-                return 'File Not Found'
+                Id = 'Unknown'
+                tt = str(Id)
 
-        except Exception as e:
-            print('The Exception message is: ', e)
-            return 'something is wrong'
+            if conf > 75:
+                noOfFile = len(os.listdir("ImagesUnknown")) + 1
+                cv2.imwrite(f"ImagesUnknown/Image{noOfFile}.jpg", im[y:y + h, x + w])
 
-    else:
-        return render_template('index.html')
+            cv2.putText(im, str(tt), (x, y + h), font, 1, (255, 255, 255), 2)
 
+        # Drop duplicates to ensure only one entry per person per session
+        attendance = attendance.drop_duplicates(subset=['Id'], keep='first')
+        
+        # Display live frame with attendance information
+        cv2.imshow('Face Recognition Attendance', im)
 
+        # Stop the process when 'q' is pressed or if attendance is recorded
+        if cv2.waitKey(1) & 0xFF == ord('q') or not attendance.empty:
+            break
 
-@app.route('/uploadfile',methods=['POST','GET'])  #
-@cross_origin()
-def uploadfile():
-    return render_template('upload.html')
+    # Save the attendance to a CSV file
+    if not attendance.empty:
+        ts = time.time()
+        date = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
+        timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
+        Hour, Minute, Second = timeStamp.split(":")
+        fileName = f"Attendance/Attendance_{date}_{Hour}-{Minute}-{Second}.csv"
+        attendance.to_csv(fileName, index=False)
+    
+    # Release the camera and close windows
+    cam.release()
+    cv2.destroyAllWindows()
 
+    # Update UI message
+    message2.configure(text="Attendance has been marked!")
+    # message2.configure(text=str(attendance.tail(5)))
 
+    # Ready for quit action
+    quitWindow.config(state=tk.NORMAL)  # Enable the quit button
 
+# Create necessary directories if not exist
+if not os.path.exists('TrainingImage'):
+    os.makedirs('TrainingImage')
 
-if __name__ == "__main__":
-    #to run on cloud
-    #port = int(os.getenv("PORT"))
-    #app.run(host='0.0.0.0', port=port)  # running the app
+if not os.path.exists('TrainingImageLabel'):
+    os.makedirs('TrainingImageLabel')
 
-    #to run locally
-    app.run(host='127.0.0.1', port=8000, debug=True)
+if not os.path.exists('ImagesUnknown'):
+    os.makedirs('ImagesUnknown')
 
+if not os.path.exists('Attendance'):
+    os.makedirs('Attendance')
 
+if not os.path.exists('EmployeeDetails'):
+    os.makedirs('EmployeeDetails')
 
+# Buttons for the functions
+clearButton = tk.Button(window, text="Clear", command=clear, fg="red", bg="yellow",
+                        width=20, height=2, activebackground="Red", font=('times', 15, ' bold '))
+
+clearButton.place(x=950, y=200)
+
+clearButton2 = tk.Button(window, text="Clear", command=clear2, fg="red", bg="yellow",
+                         width=20, height=2, activebackground="Red", font=('times', 15, ' bold '))
+
+clearButton2.place(x=950, y=300)
+
+takeImg = tk.Button(window, text="Take Images", command=TakeImages, fg="red", bg="yellow",
+                    width=20, height=3, activebackground="Red", font=('times', 15, ' bold '))
+
+takeImg.place(x=200, y=500)
+
+trainImg = tk.Button(window, text="Train Images", command=TrainImages, fg="red",
+                     bg="yellow", width=20, height=3, activebackground="Red", font=('times', 15, ' bold '))
+
+trainImg.place(x=500, y=500)
+
+trackImg = tk.Button(window, text="Track Images", command=TrackImages, fg="red",
+                     bg="yellow", width=20, height=3, activebackground="Red", font=('times', 15, ' bold '))
+
+trackImg.place(x=800, y=500)
+
+quitWindow = tk.Button(window, text="Quit", command=window.quit, fg="red", bg="yellow",
+                       width=20, height=3, activebackground="Red", font=('times', 15, ' bold '))
+
+quitWindow.place(x=1100, y=500)
+
+# Initially disable the quit button
+quitWindow.config(state=tk.DISABLED)
+
+# Run the main window loop
+window.mainloop()
